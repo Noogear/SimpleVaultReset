@@ -3,6 +3,8 @@ package cn.simplevaultreset;
 import cn.simplevaultreset.adapter.VaultAccessor;
 import cn.simplevaultreset.adapter.impl.VaultAccessorLegacy;
 import cn.simplevaultreset.adapter.impl.VaultAccessorModern;
+import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -13,16 +15,16 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public final class SimpleVaultReset extends JavaPlugin implements Listener {
-    private static final ConcurrentHashMap<Location, VaultResetRunnable> PENDING_RESETS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Location, VaultResetTask> PENDING_RESETS = new ConcurrentHashMap<>();
     private static VaultAccessor vaultAccessor;
+    private final RegionScheduler regionScheduler = getServer().getRegionScheduler();
     private long resetDelay;
     private String cooldownMessage;
 
@@ -61,8 +63,10 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         getServer().getScheduler().cancelTasks(this);
+        getServer().getGlobalRegionScheduler().cancelTasks(this);
+        getServer().getAsyncScheduler().cancelTasks(this);
         if (!PENDING_RESETS.isEmpty()) {
-            for (VaultResetRunnable runnable : PENDING_RESETS.values()) {
+            for (VaultResetTask runnable : PENDING_RESETS.values()) {
                 runnable.reset();
             }
         }
@@ -78,44 +82,43 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
         if (clickedBlock == null || clickedBlock.getType() != Material.VAULT) {
             return;
         }
-        final ItemStack itemInHand = event.getItem();
-        if (itemInHand == null || (itemInHand.getType() != Material.TRIAL_KEY && itemInHand.getType() != Material.OMINOUS_TRIAL_KEY)) {
+        if (!event.hasItem()) {
             return;
         }
 
         final Location location = clickedBlock.getLocation();
-
         if (PENDING_RESETS.containsKey(location)) {
             event.getPlayer().sendMessage(MiniMessage.miniMessage().deserialize(cooldownMessage));
             return;
         }
+
         final Vault vaultData = (Vault) clickedBlock.getBlockData();
         if (vaultAccessor.getState(vaultData) != Vault.State.ACTIVE) {
             return;
         }
 
-        final VaultResetRunnable runnable = new VaultResetRunnable(location, vaultData);
-        PENDING_RESETS.put(location, runnable);
-        runnable.runTaskLater(this, resetDelay);
+        if (vaultData.isOminous()) {
+            if (event.getMaterial() != Material.OMINOUS_TRIAL_KEY) {
+                return;
+            }
+        } else {
+            if (event.getMaterial() != Material.TRIAL_KEY) {
+                return;
+            }
+        }
+
+        final VaultResetTask task = new VaultResetTask(location, vaultData);
+        PENDING_RESETS.put(location, task);
+        regionScheduler.runDelayed(this, location, task, resetDelay);
     }
 
-
-    static class VaultResetRunnable extends BukkitRunnable {
+    static class VaultResetTask implements Consumer<ScheduledTask> {
         private final Location location;
         private final Vault vaultData;
 
-        public VaultResetRunnable(final Location location, final Vault vaultData) {
+        public VaultResetTask(final Location location, final Vault vaultData) {
             this.location = location;
             this.vaultData = vaultData;
-        }
-
-        @Override
-        public void run() {
-            try {
-                reset();
-            } finally {
-                PENDING_RESETS.remove(location);
-            }
         }
 
         public void reset() {
@@ -132,5 +135,13 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
             }
         }
 
+        @Override
+        public void accept(ScheduledTask scheduledTask) {
+            try {
+                reset();
+            } finally {
+                PENDING_RESETS.remove(location);
+            }
+        }
     }
 }
