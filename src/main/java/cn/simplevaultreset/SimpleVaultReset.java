@@ -8,7 +8,6 @@ import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Vault;
 import org.bukkit.event.EventHandler;
@@ -48,7 +47,7 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
 
         getServer().getPluginManager().registerEvents(this, this);
 
-        MainCommand svrCommand = new MainCommand(this);
+        MainCommand svrCommand = new MainCommand(this, vaultAccessor);
         Objects.requireNonNull(this.getCommand("simplevaultreset")).setExecutor(svrCommand);
         Objects.requireNonNull(this.getCommand("simplevaultreset")).setTabCompleter(svrCommand);
 
@@ -107,31 +106,25 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
             }
         }
 
-        final VaultResetTask task = new VaultResetTask(location, vaultData);
+        final VaultResetTask task = new VaultResetTask(location);
         PENDING_RESETS.put(location, task);
         regionScheduler.runDelayed(this, location, task, resetDelay);
     }
 
     static class VaultResetTask implements Consumer<ScheduledTask> {
         private final Location location;
-        private final Vault vaultData;
 
-        public VaultResetTask(final Location location, final Vault vaultData) {
+        public VaultResetTask(final Location location) {
             this.location = location;
-            this.vaultData = vaultData;
         }
 
         public void reset() {
             final Block currentBlock = location.getBlock();
             if (currentBlock.getType() == Material.VAULT) {
-                currentBlock.setType(Material.AIR, false);
-
+                vaultAccessor.clearRewardedPlayers(currentBlock);
                 if (location.getNearbyPlayers(4).isEmpty()) {
-                    vaultAccessor.setState(vaultData, Vault.State.INACTIVE);
-                } else {
-                    location.getWorld().playSound(location, Sound.BLOCK_VAULT_ACTIVATE, 1.0f, 1.0f);
+                    vaultAccessor.setState((Vault) currentBlock.getBlockData(), Vault.State.INACTIVE);
                 }
-                currentBlock.setBlockData(vaultData, true);
             }
         }
 

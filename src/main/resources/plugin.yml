@@ -1,15 +1,19 @@
 name: SimpleVaultReset
-version: '1.0'
+version: '1.1'
 main: cn.simplevaultreset.SimpleVaultReset
 api-version: '1.21'
 folia-supported: true
 
 commands:
   simplevaultreset:
-    usage: "/<command> reload"
+    description: Main command.
+    usage: /<command>
     aliases: [svr]
-    permission: simplevaultreset.reload
 
 permissions:
   simplevaultreset.reload:
+    default: op
+  simplevaultreset.giveominous:
+    default: op
+  simplevaultreset.resetchunk:
     default: op
