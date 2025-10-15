@@ -1,0 +1,14 @@
+name: SimpleVaultReset
+version: '1.0'
+main: cn.simplevaultreset.SimpleVaultReset
+api-version: '1.21'
+
+commands:
+  simplevaultreset:
+    usage: "/<command> reload"
+    aliases: [svr]
+    permission: simplevaultreset.reload
+
+permissions:
+  simplevaultreset.reload:
+    default: op
