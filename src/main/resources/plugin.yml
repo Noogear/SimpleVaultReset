@@ -8,7 +8,7 @@ commands:
   simplevaultreset:
     description: Main command.
     usage: /<command>
-    aliases: [svr]
+    aliases: [ svr ]
 
 permissions:
   simplevaultreset.reload:

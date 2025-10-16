@@ -55,7 +55,13 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
     }
 
     public void loadConfigValues() {
-        this.resetDelay = getConfig().getLong("reset-delay", 200L);
+        long resetDelay = getConfig().getLong("reset-delay", 200L);
+        if (resetDelay <= 0L) {
+            this.resetDelay = 200L;
+            getLogger().warning("Invalid reset delay in configuration. The delay must be a positive number. Using default value of 200 ticks.");
+        } else {
+            this.resetDelay = resetDelay;
+        }
         this.cooldownMessage = getConfig().getString("message.cooldown", "<red>This vault is on cooldown.</red>");
     }
 
