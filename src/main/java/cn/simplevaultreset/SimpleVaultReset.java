@@ -4,7 +4,6 @@ import cn.simplevaultreset.adapter.VaultAccessor;
 import cn.simplevaultreset.adapter.impl.VaultAccessorLegacy;
 import cn.simplevaultreset.adapter.impl.VaultAccessorModern;
 import io.papermc.paper.threadedregions.scheduler.RegionScheduler;
-import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,15 +16,16 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 public final class SimpleVaultReset extends JavaPlugin implements Listener {
-    private static final ConcurrentHashMap<Location, VaultResetTask> PENDING_RESETS = new ConcurrentHashMap<>();
-    private static VaultAccessor vaultAccessor;
+    private final Set<Location> PENDING_RESETS = ConcurrentHashMap.newKeySet();
     private final RegionScheduler regionScheduler = getServer().getRegionScheduler();
+    private VaultAccessor vaultAccessor;
     private long resetDelay;
     private String cooldownMessage;
+
 
     @Override
     public void onEnable() {
@@ -71,10 +71,11 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
         getServer().getGlobalRegionScheduler().cancelTasks(this);
         getServer().getAsyncScheduler().cancelTasks(this);
         if (!PENDING_RESETS.isEmpty()) {
-            for (VaultResetTask runnable : PENDING_RESETS.values()) {
-                runnable.reset();
+            for (Location location : PENDING_RESETS) {
+                resetVault(location);
             }
         }
+        PENDING_RESETS.clear();
         getLogger().info("SimpleVaultReset has been disabled!");
     }
 
@@ -92,7 +93,7 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
         }
 
         final Location location = clickedBlock.getLocation();
-        if (PENDING_RESETS.containsKey(location)) {
+        if (PENDING_RESETS.contains(location)) {
             event.getPlayer().sendMessage(MiniMessage.miniMessage().deserialize(cooldownMessage));
             return;
         }
@@ -112,35 +113,19 @@ public final class SimpleVaultReset extends JavaPlugin implements Listener {
             }
         }
 
-        final VaultResetTask task = new VaultResetTask(location);
-        PENDING_RESETS.put(location, task);
-        regionScheduler.runDelayed(this, location, task, resetDelay);
+        PENDING_RESETS.add(location);
+        regionScheduler.runDelayed(this, location, task -> resetVault(location), resetDelay);
     }
 
-    static class VaultResetTask implements Consumer<ScheduledTask> {
-        private final Location location;
-
-        public VaultResetTask(final Location location) {
-            this.location = location;
-        }
-
-        public void reset() {
+    private void resetVault(Location location) {
+        try {
             final Block currentBlock = location.getBlock();
             if (currentBlock.getType() == Material.VAULT) {
                 vaultAccessor.clearRewardedPlayers(currentBlock);
-                if (location.getNearbyPlayers(4).isEmpty()) {
-                    vaultAccessor.setState((Vault) currentBlock.getBlockData(), Vault.State.INACTIVE);
-                }
             }
-        }
-
-        @Override
-        public void accept(ScheduledTask scheduledTask) {
-            try {
-                reset();
-            } finally {
-                PENDING_RESETS.remove(location);
-            }
+        } finally {
+            PENDING_RESETS.remove(location);
         }
     }
+
 }

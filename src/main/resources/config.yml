@@ -1,5 +1,5 @@
 # 1s = 20ticks
-reset-delay: 200
+reset-delay: 120
 
 message:
   cooldown: "<red>This vault is on cooldown.</red>"

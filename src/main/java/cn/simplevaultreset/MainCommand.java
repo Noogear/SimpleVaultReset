@@ -4,6 +4,7 @@ import cn.simplevaultreset.adapter.VaultAccessor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Vault;
 import org.bukkit.command.Command;
@@ -21,13 +22,21 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class MainCommand implements CommandExecutor, TabCompleter {
-
+    private final ItemStack ominous;
     private final SimpleVaultReset plugin;
     private final VaultAccessor vaultAccessor;
 
     public MainCommand(SimpleVaultReset plugin, VaultAccessor vaultAccessor) {
         this.plugin = plugin;
         this.vaultAccessor = vaultAccessor;
+        ItemStack ominous;
+        try {
+            ominous = Bukkit.getItemFactory().createItemStack("minecraft:vault[minecraft:block_entity_data={id:\"minecraft:vault\",config:{loot_table:\"minecraft:chests/trial_chambers/reward_ominous\",key_item:{count:1,id:\"minecraft:ominous_trial_key\"}}},minecraft:block_state={ominous:\"true\"}]");
+        } catch (Exception e) {
+            ominous = new ItemStack(Material.VAULT);
+            plugin.getLogger().warning("Failed to create the Ominous Vault item. Please ensure you are using a compatible server version." + e);
+        }
+        this.ominous = ominous;
     }
 
     @Override
@@ -69,14 +78,8 @@ public class MainCommand implements CommandExecutor, TabCompleter {
         if (!(sender instanceof Player player)) {
             return false;
         }
-
-        try {
-            ItemStack ominous = Bukkit.getItemFactory().createItemStack("minecraft:vault[minecraft:block_entity_data={id:\"minecraft:vault\",config:{loot_table:\"minecraft:chests/trial_chambers/reward_ominous\",key_item:{count:1,id:\"minecraft:ominous_trial_key\"}}},minecraft:block_state={ominous:\"true\"}]");
-            player.getInventory().addItem(ominous);
-        } catch (Exception e) {
-            player.sendMessage(Component.text("Failed to create the Ominous Vault item. Please ensure you are using a compatible server version.", NamedTextColor.RED));
-            return true;
-        }
+        player.getInventory().addItem(ominous.clone());
+        sender.sendMessage(Component.text("You have been given the Ominous Vault item.", NamedTextColor.GREEN));
         return true;
     }
 
@@ -94,6 +97,7 @@ public class MainCommand implements CommandExecutor, TabCompleter {
                 vaultAccessor.clearRewardedPlayers(state.getBlock());
             }
         }
+        sender.sendMessage(Component.text("All vaults in this chunk have been reset.", NamedTextColor.GREEN));
         return true;
     }
 
